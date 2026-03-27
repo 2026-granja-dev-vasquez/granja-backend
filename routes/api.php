@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\BatchController;
+use App\Http\Controllers\ProductSizeController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -29,4 +30,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Módulo 2: Gestión de Lotes
     Route::apiResource('batches', BatchController::class);
     Route::post('batches/{batch}/mortality', [BatchController::class, 'registerMortality']);
+
+    // Módulo 3: Configuración de Productos (Tamaños y Precios)
+    Route::apiResource('product-sizes', ProductSizeController::class);
 });
