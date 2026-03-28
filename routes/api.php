@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\BatchCollectionController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\SaleController;
+use App\Http\Controllers\Api\CashBoxController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -56,4 +57,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // Módulo 5: Gestión de Clientes y Ventas
     Route::apiResource('customers', CustomerController::class);
     Route::apiResource('sales',     SaleController::class);
+
+    // Módulo 6: Gestión de Caja (Cash Management)
+    Route::get('cash/current',         [CashBoxController::class, 'current']);
+    Route::post('cash/open',           [CashBoxController::class, 'open']);
+    Route::post('cash/close',          [CashBoxController::class, 'close']);
+    Route::post('cash/transactions',   [CashBoxController::class, 'storeTransaction']);
+    Route::get('cash/history',         [CashBoxController::class, 'index']);
 });

@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\Inventory;
+use App\Models\CashBox;
+use App\Models\CashTransaction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -51,6 +53,18 @@ class SaleController extends Controller
 
         try {
             return DB::transaction(function () use ($validated) {
+                // 0. VALIDAR CAJA ABIERTA (Si es venta pagada o parcial)
+                if ($validated['status'] !== 'pending' || $validated['paid_amount'] > 0) {
+                    $hasActiveBox = CashBox::where('status', 'open')->exists();
+                    if (!$hasActiveBox) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'No hay una caja abierta. Por favor, abre una sesión primero para registrar pagos.',
+                            'code' => 'CASH_BOX_CLOSED'
+                        ], 422);
+                    }
+                }
+
                 // 1. Crear la Venta
                 $sale = Sale::create([
                     'customer_id'  => $validated['customer_id'],
@@ -78,6 +92,22 @@ class SaleController extends Controller
                     }
 
                     $inventory->decrement('units_available', $itemData['quantity']);
+                }
+
+                // 3. REGISTRAR EN CAJA (Si la venta es pagada y hay una caja abierta)
+                if ($sale->status === 'paid' || $sale->paid_amount > 0) {
+                    $activeCashBox = CashBox::where('status', 'open')->first();
+                    if ($activeCashBox) {
+                        $activeCashBox->transactions()->create([
+                            'type'           => 'income',
+                            'amount'         => (float)$sale->paid_amount,
+                            'category'       => 'Venta',
+                            'description'    => "Venta #{$sale->id} - " . ($sale->customer ? $sale->customer->name : 'Consumidor Final'),
+                            'reference_id'   => $sale->id,
+                            'reference_type' => Sale::class,
+                        ]);
+                        $activeCashBox->increment('total_income', (float)$sale->paid_amount);
+                    }
                 }
 
                 return response()->json([
@@ -116,7 +146,26 @@ class SaleController extends Controller
             'notes'       => 'nullable|string',
         ]);
 
+        $oldStatus = $sale->status;
         $sale->update($validated);
+
+        // REGISTRAR EN CAJA (Si cambia a pagada o ya era pagada pero se actualizó el monto)
+        if (($oldStatus !== 'paid' && $sale->status === 'paid') || ($sale->status === 'paid' && isset($validated['paid_amount']))) {
+            $activeCashBox = CashBox::where('status', 'open')->first();
+            if ($activeCashBox) {
+                $amountToRecord = $validated['paid_amount'] ?? $sale->paid_amount;
+                
+                $activeCashBox->transactions()->create([
+                    'type'           => 'income',
+                    'amount'         => $amountToRecord,
+                    'category'       => 'Venta',
+                    'description'    => "COBRO de " . ($sale->customer ? $sale->customer->name : 'Consumidor Final') . " por fiado (Venta #{$sale->id})",
+                    'reference_id'   => $sale->id,
+                    'reference_type' => Sale::class,
+                ]);
+                $activeCashBox->increment('total_income', (float)$amountToRecord);
+            }
+        }
 
         return response()->json([
             'success' => true,
