@@ -134,4 +134,22 @@ class ProductionController extends Controller
 
         return response()->json($finalReports);
     }
+
+    /**
+     * Remove the specified sorted production.
+     */
+    public function destroy(Production $production)
+    {
+        // Si tenía tamaño (buenos), revertir el stock de inventario
+        if ($production->product_size_id && $production->useful_quantity > 0) {
+            $inventory = \App\Models\Inventory::where('product_size_id', $production->product_size_id)->first();
+            if ($inventory) {
+                $inventory->decrement('units_available', $production->useful_quantity);
+            }
+        }
+
+        $production->delete();
+
+        return response()->json(['message' => 'Registro de producción eliminado y stock revertido']);
+    }
 }
