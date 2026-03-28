@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\CashBoxController;
+use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -65,4 +66,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('cash/transactions',   [CashBoxController::class, 'storeTransaction']);
     Route::get('cash/history',         [CashBoxController::class, 'index']);
     Route::get('cash/history/{cash_box}', [CashBoxController::class, 'show']);
+
+    // Módulo 7: Gestión de Usuarios
+    Route::apiResource('users', UserController::class);
+    Route::post('auth/change-password', [UserController::class, 'changePassword']);
 });
