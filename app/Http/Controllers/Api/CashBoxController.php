@@ -15,11 +15,21 @@ class CashBoxController extends Controller
      */
     public function index(Request $request)
     {
-        $history = CashBox::with('transactions')
-            ->orderBy('id', 'desc')
+        $history = CashBox::orderBy('id', 'desc')
             ->paginate(15);
 
         return response()->json($history);
+    }
+
+    /**
+     * Get details of a specific historical cash box session.
+     */
+    public function show($id)
+    {
+        $cashBox = CashBox::with('transactions')
+            ->findOrFail($id);
+
+        return response()->json($cashBox);
     }
 
     /**
