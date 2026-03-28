@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\ProductionController;
 use App\Http\Controllers\Api\BatchCollectionController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\SaleController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -54,4 +55,5 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Módulo 5: Gestión de Clientes y Ventas
     Route::apiResource('customers', CustomerController::class);
+    Route::apiResource('sales',     SaleController::class);
 });

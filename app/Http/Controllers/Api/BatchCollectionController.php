@@ -18,9 +18,9 @@ class BatchCollectionController extends Controller
         $query = BatchCollection::with('batch')->orderBy('date', 'desc');
 
         if ($request->has('date')) {
-            $query->whereDate('date', $request->date);
+            $query->where('date', $request->date);
         } elseif ($request->has('start_date')) {
-            $query->whereDate('date', '>=', $request->start_date);
+            $query->where('date', '>=', $request->start_date);
         }
 
         if ($request->has('batch_id')) {
@@ -59,7 +59,7 @@ class BatchCollectionController extends Controller
     public function dailyTotal(Request $request)
     {
         $date = $request->date ?? now()->toDateString();
-        $total = BatchCollection::whereDate('date', $date)->sum('quantity');
+        $total = BatchCollection::where('date', $date)->sum('quantity');
         
         return response()->json(['date' => $date, 'total_raw_eggs' => (int)$total]);
     }
