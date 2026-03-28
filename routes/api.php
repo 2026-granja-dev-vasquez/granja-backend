@@ -40,6 +40,7 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // 4.1: Recolecta por Lote (Punto de Vista Pura Postura)
     Route::get('daily-collections/total', [BatchCollectionController::class, 'dailyTotal']);
+    Route::get('daily-collections/summary', [BatchCollectionController::class, 'summary']);
     Route::apiResource('daily-collections', BatchCollectionController::class);
 
     // 4.2: Clasificación de Inventario (Punto de Vista Venta/Cartones)
