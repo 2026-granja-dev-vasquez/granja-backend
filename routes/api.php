@@ -6,6 +6,8 @@ use App\Http\Controllers\BatchController;
 use App\Http\Controllers\ProductSizeController;
 use App\Http\Controllers\Api\ProductionController;
 use App\Http\Controllers\Api\BatchCollectionController;
+use App\Http\Controllers\Api\InventoryController;
+use App\Http\Controllers\Api\CustomerController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -46,4 +48,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // 4.2: Clasificación de Inventario (Punto de Vista Venta/Cartones)
     Route::get('productions/summary', [ProductionController::class, 'summary']);
     Route::apiResource('productions', ProductionController::class);
+
+    // 4.3: Inventario Actual (Stock)
+    Route::get('inventory', [InventoryController::class, 'index']);
+
+    // Módulo 5: Gestión de Clientes y Ventas
+    Route::apiResource('customers', CustomerController::class);
 });

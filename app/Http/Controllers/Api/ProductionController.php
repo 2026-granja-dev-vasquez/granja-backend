@@ -44,8 +44,18 @@ class ProductionController extends Controller
 
         $production = Production::create($request->all());
 
+        // Actualizar Stock de Inventario automáticamente si no es un registro global de quebrados
+        if ($production->product_size_id && $production->useful_quantity > 0) {
+            $inventory = \App\Models\Inventory::firstOrCreate(
+                ['product_size_id' => $production->product_size_id],
+                ['units_available' => 0]
+            );
+            
+            $inventory->increment('units_available', $production->useful_quantity);
+        }
+
         return response()->json([
-            'message' => 'Clasificación registrada con éxito',
+            'message' => 'Clasificación registrada y stock actualizado',
             'data' => $production->load('productSize')
         ], 201);
     }

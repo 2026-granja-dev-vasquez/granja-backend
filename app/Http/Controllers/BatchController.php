@@ -10,7 +10,7 @@ class BatchController extends Controller
 {
     public function index()
     {
-        return response()->json(Batch::where('status', 'active')->orderBy('acquisition_date', 'desc')->get());
+        return response()->json(Batch::orderBy('status')->orderBy('acquisition_date', 'desc')->get());
     }
 
     public function store(Request $request)
