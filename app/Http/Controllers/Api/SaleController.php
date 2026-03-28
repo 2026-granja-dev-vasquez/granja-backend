@@ -12,13 +12,21 @@ use Illuminate\Support\Facades\DB;
 class SaleController extends Controller
 {
     /**
-     * Listar todas las ventas con sus items y cliente.
+     * Listar ventas con filtros (fecha, cliente).
      */
-    public function index()
+    public function index(Request $request)
     {
-        $sales = Sale::with(['customer', 'items.productSize'])
-                    ->orderBy('date', 'desc')
-                    ->get();
+        $query = Sale::with(['customer', 'items.productSize']);
+
+        if ($request->has('customer_id')) {
+            $query->where('customer_id', $request->customer_id);
+        }
+
+        if ($request->has('start_date') && $request->has('end_date')) {
+            $query->whereBetween('date', [$request->start_date . ' 00:00:00', $request->end_date . ' 23:59:59']);
+        }
+
+        $sales = $query->orderBy('date', 'desc')->get();
         return response()->json($sales);
     }
 
@@ -93,5 +101,27 @@ class SaleController extends Controller
     {
         $sale = Sale::with(['customer', 'items.productSize'])->findOrFail($id);
         return response()->json($sale);
+    }
+
+    /**
+     * Actualizar estado de pago de una venta.
+     */
+    public function update(Request $request, $id)
+    {
+        $sale = Sale::findOrFail($id);
+
+        $validated = $request->validate([
+            'paid_amount' => 'nullable|numeric|min:0',
+            'status'      => 'nullable|in:pending,paid,partial',
+            'notes'       => 'nullable|string',
+        ]);
+
+        $sale->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Venta actualizada correctamente.',
+            'sale'    => $sale->load(['customer', 'items.productSize'])
+        ]);
     }
 }
