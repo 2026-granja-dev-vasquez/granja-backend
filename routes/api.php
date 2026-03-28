@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\CashBoxController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\ReminderController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -70,4 +71,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Módulo 7: Gestión de Usuarios
     Route::apiResource('users', UserController::class);
     Route::post('auth/change-password', [UserController::class, 'changePassword']);
+
+    // Módulo 8: Recordatorios Compartidos (Multiusuario & Administrador)
+    Route::get('reminders', [ReminderController::class, 'index']);
+    Route::post('reminders', [ReminderController::class, 'store']);
+    Route::get('reminders/history', [ReminderController::class, 'history']);
+    Route::post('reminders/{reminder}/done', [ReminderController::class, 'markAsDone']);
 });
