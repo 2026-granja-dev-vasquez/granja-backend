@@ -4,6 +4,8 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\BatchController;
 use App\Http\Controllers\ProductSizeController;
+use App\Http\Controllers\Api\ProductionController;
+use App\Http\Controllers\Api\BatchCollectionController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -33,4 +35,14 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Módulo 3: Configuración de Productos (Tamaños y Precios)
     Route::apiResource('product-sizes', ProductSizeController::class);
+
+    // Módulo 4: Producción y Recolección Diaria
+    
+    // 4.1: Recolecta por Lote (Punto de Vista Pura Postura)
+    Route::get('daily-collections/total', [BatchCollectionController::class, 'dailyTotal']);
+    Route::apiResource('daily-collections', BatchCollectionController::class);
+
+    // 4.2: Clasificación de Inventario (Punto de Vista Venta/Cartones)
+    Route::get('productions/summary', [ProductionController::class, 'summary']);
+    Route::apiResource('productions', ProductionController::class);
 });
