@@ -77,4 +77,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('reminders', [ReminderController::class, 'store']);
     Route::get('reminders/history', [ReminderController::class, 'history']);
     Route::post('reminders/{reminder}/done', [ReminderController::class, 'markAsDone']);
+
+    // Módulo 9: Pedidos de Clientes (Independientes)
+    Route::get('orders', [\App\Http\Controllers\OrderController::class, 'index']);
+    Route::post('orders', [\App\Http\Controllers\OrderController::class, 'store']);
+    Route::get('orders/history', [\App\Http\Controllers\OrderController::class, 'history']);
+    Route::post('orders/{order}/status', [\App\Http\Controllers\OrderController::class, 'updateStatus']);
 });
