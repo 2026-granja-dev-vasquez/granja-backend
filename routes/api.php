@@ -55,6 +55,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // 4.3: Inventario Actual (Stock)
     Route::get('inventory', [InventoryController::class, 'index']);
+    Route::post('inventory/adjust', [InventoryController::class, 'adjust']);
 
     // Módulo 5: Gestión de Clientes y Ventas
     Route::apiResource('customers', CustomerController::class);
