@@ -9,7 +9,7 @@ class OrderController extends Controller
 {
     public function index()
     {
-        $orders = Order::with('customer')
+        $orders = Order::with(['customer', 'items.productSize'])
             ->whereIn('status', ['pending', 'postponed'])
             ->orderBy('delivery_date', 'asc')
             ->get();
@@ -19,7 +19,7 @@ class OrderController extends Controller
 
     public function history(Request $request)
     {
-        $query = Order::with('customer')
+        $query = Order::with(['customer', 'items.productSize'])
             ->whereIn('status', ['delivered', 'cancelled'])
             ->orderBy('delivery_date', 'desc');
 
@@ -38,16 +38,28 @@ class OrderController extends Controller
         $request->validate([
             'customer_id' => 'required|exists:customers,id',
             'delivery_date' => 'required|date',
+            'items' => 'required|array|min:1',
+            'items.*.product_size_id' => 'required|exists:product_sizes,id',
+            'items.*.quantity' => 'required|integer|min:1',
         ]);
 
-        $order = Order::create([
-            'customer_id' => $request->customer_id,
-            'delivery_date' => $request->delivery_date,
-            'status' => 'pending',
-            'notes' => $request->notes,
-        ]);
+        return \DB::transaction(function() use ($request) {
+            $order = Order::create([
+                'customer_id' => $request->customer_id,
+                'delivery_date' => $request->delivery_date,
+                'status' => 'pending',
+                'notes' => $request->notes,
+            ]);
 
-        return response()->json($order->load('customer'), 201);
+            foreach ($request->items as $item) {
+                $order->items()->create([
+                    'product_size_id' => $item['product_size_id'],
+                    'quantity' => $item['quantity'],
+                ]);
+            }
+
+            return response()->json($order->load(['customer', 'items.productSize']), 201);
+        });
     }
 
     public function updateStatus(Request $request, Order $order)
@@ -70,6 +82,6 @@ class OrderController extends Controller
 
         $order->save();
 
-        return response()->json($order->load('customer'));
+        return response()->json($order->load(['customer', 'items.productSize']));
     }
 }
