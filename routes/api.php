@@ -50,6 +50,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('daily-collections', BatchCollectionController::class);
 
     // 4.2: Clasificación de Inventario (Punto de Vista Venta/Cartones)
+    Route::get('productions/pending-balance', [ProductionController::class, 'pendingBalance']);
     Route::get('productions/summary', [ProductionController::class, 'summary']);
     Route::apiResource('productions', ProductionController::class);
 

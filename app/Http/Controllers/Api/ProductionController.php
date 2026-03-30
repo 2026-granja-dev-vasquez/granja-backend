@@ -94,6 +94,11 @@ class ProductionController extends Controller
         while ($currentDate->greaterThanOrEqualTo($startDate)) {
             $dateStr = $currentDate->toDateString();
             
+            // Calcular saldo pendiente al cierre de ese día específico
+            $totalCollUpToDate = \App\Models\BatchCollection::where('date', '<=', $dateStr)->sum('quantity');
+            $totalSortUpToDate = Production::where('date', '<=', $dateStr)->sum(\DB::raw('useful_quantity + damaged_quantity'));
+            $pendingAtClose = max(0, $totalCollUpToDate - $totalSortUpToDate);
+
             if ($grouped->has($dateStr)) {
                 $items = $grouped->get($dateStr);
                 $totalDamagedValue = (int)$items->sum('damaged_quantity');
@@ -118,13 +123,15 @@ class ProductionController extends Controller
                 $finalReports[] = [
                     'date' => $dateStr,
                     'total_damaged' => $totalDamagedValue,
+                    'total_pending' => (int)$pendingAtClose,
                     'report' => $bySize
                 ];
             } else {
-                // Return empty day
+                // Return empty day but with its pending balance
                 $finalReports[] = [
                     'date' => $dateStr,
                     'total_damaged' => 0,
+                    'total_pending' => (int)$pendingAtClose,
                     'report' => []
                 ];
             }
@@ -151,5 +158,23 @@ class ProductionController extends Controller
         $production->delete();
 
         return response()->json(['message' => 'Registro de producción eliminado y stock revertido']);
+    }
+    /*
+     * Get pending eggs from previous days (Total Collected - Total Sorted up until date - 1).
+     */
+    public function pendingBalance(Request $request)
+    {
+        $date = $request->date ? Carbon::parse($request->date) : Carbon::now();
+        $dateStr = $date->toDateString();
+
+        $totalCollected = \App\Models\BatchCollection::where('date', '<', $dateStr)->sum('quantity');
+        $totalSorted = Production::where('date', '<', $dateStr)->sum(\DB::raw('useful_quantity + damaged_quantity'));
+
+        $pending = max(0, $totalCollected - $totalSorted);
+
+        return response()->json([
+            'date' => $dateStr,
+            'pending_from_yesterday' => (int)$pending
+        ]);
     }
 }
