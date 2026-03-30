@@ -69,6 +69,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('cash/transactions',   [CashBoxController::class, 'storeTransaction']);
     Route::get('cash/history',         [CashBoxController::class, 'index']);
     Route::get('cash/history/{cash_box}', [CashBoxController::class, 'show']);
+    Route::patch('cash/history/{cash_box}', [CashBoxController::class, 'update']);
 
     // Módulo 7: Gestión de Usuarios
     Route::apiResource('users', UserController::class);

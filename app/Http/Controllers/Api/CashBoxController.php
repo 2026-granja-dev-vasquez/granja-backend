@@ -134,4 +134,21 @@ class CashBoxController extends Controller
 
         return response()->json($cashBox);
     }
+
+
+    /**
+     * Update a cash box session (e.g., change name).
+     */
+    public function update(Request $request, CashBox $cashBox)
+    {
+        $request->validate([
+            'name' => 'required|string',
+        ]);
+
+        $cashBox->update([
+            'name' => $request->name,
+        ]);
+
+        return response()->json($cashBox);
+    }
 }
