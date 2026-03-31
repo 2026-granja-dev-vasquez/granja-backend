@@ -18,7 +18,7 @@ class BatchCollectionController extends Controller
         $query = BatchCollection::with('batch')->orderBy('date', 'desc');
 
         if ($request->has('date')) {
-            $query->where('date', $request->date);
+            $query->whereDate('date', $request->date);
         } elseif ($request->has('start_date')) {
             $query->where('date', '>=', $request->start_date);
         }
@@ -59,7 +59,7 @@ class BatchCollectionController extends Controller
     public function dailyTotal(Request $request)
     {
         $date = $request->date ?? now()->toDateString();
-        $total = BatchCollection::where('date', $date)->sum('quantity');
+        $total = BatchCollection::whereDate('date', $date)->sum('quantity');
         
         return response()->json(['date' => $date, 'total_raw_eggs' => (int)$total]);
     }
@@ -74,15 +74,15 @@ class BatchCollectionController extends Controller
         $endDateStr = $request->end_date ?? $request->date;
 
         if (!$startDateStr && !$endDateStr) {
-            $endDate = Carbon::now();
-            $startDate = Carbon::now()->subDays(2);
+            $endDate = Carbon::now()->endOfDay();
+            $startDate = Carbon::now()->subDays(2)->startOfDay();
         } else {
-            $startDate = $startDateStr ? Carbon::parse($startDateStr) : Carbon::parse($endDateStr);
-            $endDate = Carbon::parse($endDateStr);
+            $startDate = $startDateStr ? Carbon::parse($startDateStr)->startOfDay() : Carbon::parse($endDateStr)->startOfDay();
+            $endDate = Carbon::parse($endDateStr)->endOfDay();
         }
 
         $query = BatchCollection::with('batch')
-            ->whereBetween('date', [$startDate->toDateString(), $endDate->toDateString()])
+            ->whereBetween('date', [$startDate, $endDate])
             ->orderBy('date', 'desc');
 
         $collections = $query->get();
@@ -133,5 +133,17 @@ class BatchCollectionController extends Controller
         }
 
         return response()->json($finalReports);
+    }
+
+    /**
+     * Remove the specified raw collection record.
+     */
+    public function destroy(BatchCollection $daily_collection)
+    {
+        $daily_collection->delete();
+
+        return response()->json([
+            'message' => 'Recolecta de lote eliminada correctamente'
+        ]);
     }
 }

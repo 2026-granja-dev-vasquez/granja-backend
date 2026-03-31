@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Production;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class ProductionController extends Controller
@@ -70,15 +71,15 @@ class ProductionController extends Controller
         $endDateStr = $request->end_date ?? $request->date;
 
         if (!$startDateStr && !$endDateStr) {
-            $endDate = Carbon::now();
-            $startDate = Carbon::now()->subDays(2);
+            $endDate = Carbon::now()->endOfDay();
+            $startDate = Carbon::now()->subDays(2)->startOfDay();
         } else {
-            $startDate = $startDateStr ? Carbon::parse($startDateStr) : Carbon::parse($endDateStr);
-            $endDate = Carbon::parse($endDateStr);
+            $startDate = $startDateStr ? Carbon::parse($startDateStr)->startOfDay() : Carbon::parse($endDateStr)->startOfDay();
+            $endDate = Carbon::parse($endDateStr)->endOfDay();
         }
 
         $query = Production::with('productSize')
-            ->whereBetween('date', [$startDate->toDateString(), $endDate->toDateString()])
+            ->whereBetween('date', [$startDate, $endDate])
             ->orderBy('date', 'desc');
 
         $productions = $query->get();
@@ -95,8 +96,8 @@ class ProductionController extends Controller
             $dateStr = $currentDate->toDateString();
             
             // Calcular saldo pendiente al cierre de ese día específico
-            $totalCollUpToDate = \App\Models\BatchCollection::where('date', '<=', $dateStr)->sum('quantity');
-            $totalSortUpToDate = Production::where('date', '<=', $dateStr)->sum(\DB::raw('useful_quantity + damaged_quantity'));
+            $totalCollUpToDate = \App\Models\BatchCollection::whereDate('date', '<=', $dateStr)->sum('quantity');
+            $totalSortUpToDate = Production::whereDate('date', '<=', $dateStr)->sum(DB::raw('useful_quantity + damaged_quantity'));
             $pendingAtClose = max(0, $totalCollUpToDate - $totalSortUpToDate);
 
             if ($grouped->has($dateStr)) {
@@ -167,8 +168,8 @@ class ProductionController extends Controller
         $date = $request->date ? Carbon::parse($request->date) : Carbon::now();
         $dateStr = $date->toDateString();
 
-        $totalCollected = \App\Models\BatchCollection::where('date', '<', $dateStr)->sum('quantity');
-        $totalSorted = Production::where('date', '<', $dateStr)->sum(\DB::raw('useful_quantity + damaged_quantity'));
+        $totalCollected = \App\Models\BatchCollection::whereDate('date', '<', $dateStr)->sum('quantity');
+        $totalSorted = Production::whereDate('date', '<', $dateStr)->sum(DB::raw('useful_quantity + damaged_quantity'));
 
         $pending = max(0, $totalCollected - $totalSorted);
 
