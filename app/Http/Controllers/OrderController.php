@@ -160,4 +160,39 @@ class OrderController extends Controller
             return response()->json($order->load(['customer', 'items.productSize']));
         });
     }
+
+    public function update(Request $request, Order $order)
+    {
+        $request->validate([
+            'customer_id' => 'required|exists:customers,id',
+            'delivery_date' => 'required|date',
+            'items' => 'required|array|min:1',
+            'items.*.product_size_id' => 'required|exists:product_sizes,id', // Se cambió a product_size_id para consistencia
+            'items.*.quantity' => 'required|integer|min:1',
+            'notes' => 'nullable|string',
+        ]);
+
+        return DB::transaction(function() use ($request, $order) {
+            if ($order->status !== 'pending' && $order->status !== 'postponed') {
+                throw new \Exception("Solo se pueden modificar pedidos pendientes o pospuestos.");
+            }
+
+            $order->update([
+                'customer_id'   => $request->customer_id,
+                'delivery_date' => $request->delivery_date,
+                'notes'         => $request->notes,
+            ]);
+
+            // Reemplazar items
+            $order->items()->delete();
+            foreach ($request->items as $item) {
+                $order->items()->create([
+                    'product_size_id' => $item['product_size_id'],
+                    'quantity'        => $item['quantity'],
+                ]);
+            }
+
+            return response()->json($order->load(['customer', 'items.productSize']));
+        });
+    }
 }

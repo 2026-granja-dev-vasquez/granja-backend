@@ -86,4 +86,5 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('orders', [\App\Http\Controllers\OrderController::class, 'store']);
     Route::get('orders/history', [\App\Http\Controllers\OrderController::class, 'history']);
     Route::post('orders/{order}/status', [\App\Http\Controllers\OrderController::class, 'updateStatus']);
+    Route::patch('orders/{order}', [\App\Http\Controllers\OrderController::class, 'update']);
 });
