@@ -36,16 +36,38 @@ class BatchCollectionController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'batch_id' => 'required|exists:batches,id',
-            'quantity' => 'required|integer|min:1',
+            'batch_id' => 'nullable|required_if:type,collection|exists:batches,id',
+            'quantity' => 'required|integer',
             'date' => 'required|date',
+            'type' => 'nullable|string|in:collection,adjustment',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $collection = BatchCollection::create($request->all());
+        // Lógica para ajustes: solo un ajuste por día
+        if ($request->type === 'adjustment') {
+            $date = Carbon::parse($request->date)->toDateString();
+            
+            // Buscar por fecha ignorando la hora
+            $collection = BatchCollection::whereDate('date', $date)
+                ->where('type', 'adjustment')
+                ->first();
+
+            if ($collection) {
+                $collection->update(['quantity' => $request->quantity]);
+            } else {
+                $collection = BatchCollection::create([
+                    'date' => $date,
+                    'type' => 'adjustment',
+                    'quantity' => $request[ 'quantity' ],
+                    'batch_id' => null
+                ]);
+            }
+        } else {
+            $collection = BatchCollection::create($request->all());
+        }
 
         return response()->json([
             'message' => 'Recolecta de lote registrada',

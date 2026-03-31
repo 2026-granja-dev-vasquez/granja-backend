@@ -43,20 +43,52 @@ class ProductionController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
+        $date = Carbon::parse($request->date)->toDateString();
+        $productSizeId = $request->product_size_id;
+
+        // Buscar si ya existe un registro para esta fecha y este tamaño (o nulo)
+        $existing = Production::whereDate('date', $date)
+            ->where('product_size_id', $productSizeId)
+            ->first();
+
+        if ($existing) {
+            // Calcular diferencia para ajustar stock (solo si tiene tamaño)
+            $diff = $request->useful_quantity - $existing->useful_quantity;
+            
+            $existing->update([
+                'useful_quantity' => $request->useful_quantity,
+                'damaged_quantity' => $request->damaged_quantity ?? $existing->damaged_quantity,
+            ]);
+
+            // Ajustar Stock de Inventario
+            if ($productSizeId && $diff != 0) {
+                $inventory = \App\Models\Inventory::firstOrCreate(
+                    ['product_size_id' => $productSizeId],
+                    ['units_available' => 0]
+                );
+                $inventory->increment('units_available', $diff);
+            }
+
+            return response()->json([
+                'message' => 'Actualizado correctamente',
+                'data' => $existing->load('productSize')
+            ], 200);
+        }
+
+        // Si no existe, crear nuevo
         $production = Production::create($request->all());
 
-        // Actualizar Stock de Inventario automáticamente si no es un registro global de quebrados
+        // Actualizar Stock de Inventario para nuevos registros
         if ($production->product_size_id && $production->useful_quantity > 0) {
             $inventory = \App\Models\Inventory::firstOrCreate(
                 ['product_size_id' => $production->product_size_id],
                 ['units_available' => 0]
             );
-            
             $inventory->increment('units_available', $production->useful_quantity);
         }
 
         return response()->json([
-            'message' => 'Clasificación registrada y stock actualizado',
+            'message' => 'Registrado exitosamente',
             'data' => $production->load('productSize')
         ], 201);
     }
@@ -161,14 +193,16 @@ class ProductionController extends Controller
         return response()->json(['message' => 'Registro de producción eliminado y stock revertido']);
     }
     /*
-     * Get pending eggs from previous days (Total Collected - Total Sorted up until date - 1).
+     * Get pending eggs from previous days (Total Collected + Adjustments - Total Sorted up until date - 1).
      */
     public function pendingBalance(Request $request)
     {
         $date = $request->date ? Carbon::parse($request->date) : Carbon::now();
         $dateStr = $date->toDateString();
 
+        // Sumar todo lo recolectado (normal + ajustes) antes de la fecha objetivo
         $totalCollected = \App\Models\BatchCollection::whereDate('date', '<', $dateStr)->sum('quantity');
+        
         $totalSorted = Production::whereDate('date', '<', $dateStr)->sum(DB::raw('useful_quantity + damaged_quantity'));
 
         $pending = max(0, $totalCollected - $totalSorted);
