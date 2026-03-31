@@ -51,7 +51,7 @@ class BatchCollectionController extends Controller
             $date = Carbon::parse($request->date)->toDateString();
             
             // Buscar por fecha ignorando la hora
-            $collection = BatchCollection::whereDate('date', $date)
+            $collection = BatchCollection::where('date', 'like', $date . '%')
                 ->where('type', 'adjustment')
                 ->first();
 
