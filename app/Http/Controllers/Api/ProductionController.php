@@ -202,7 +202,14 @@ class ProductionController extends Controller
         $dateStr = $date->toDateString();
 
         // Sumar todo lo recolectado (normal + ajustes) antes de la fecha objetivo
-        $totalCollected = \App\Models\BatchCollection::whereDate('date', '<', $dateStr)->sum('quantity');
+        // IMPORTANTE: Incluimos los resets del mismo día ya que son ajustes para "iniciar bien" ese día
+        $totalCollected = \App\Models\BatchCollection::where(function($q) use ($dateStr) {
+            $q->whereDate('date', '<', $dateStr)
+              ->orWhere(function($sub) use ($dateStr) {
+                  $sub->whereDate('date', $dateStr)
+                      ->whereIn('type', ['reset', 'adjustment']);
+              });
+        })->sum('quantity');
         
         $totalSorted = Production::whereDate('date', '<', $dateStr)->sum(DB::raw('useful_quantity + damaged_quantity'));
 
