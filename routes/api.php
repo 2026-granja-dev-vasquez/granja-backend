@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\CashBoxController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\ReminderController;
+use App\Http\Controllers\Api\TableEggController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -52,9 +53,16 @@ Route::middleware('auth:sanctum')->group(function () {
     // 4.2: Clasificación de Inventario (Punto de Vista Venta/Cartones)
     Route::get('productions/pending-balance', [ProductionController::class, 'pendingBalance']);
     Route::get('productions/summary', [ProductionController::class, 'summary']);
+    Route::post('productions/reset-balance', [ProductionController::class, 'resetBalance']);
     Route::apiResource('productions', ProductionController::class);
 
-    // 4.3: Inventario Actual (Stock)
+    // 4.3: Huevos en Mesa (Remanentes de clasificación del día anterior)
+    Route::get('table-eggs',         [TableEggController::class, 'index']);
+    Route::post('table-eggs',        [TableEggController::class, 'store']);
+    Route::delete('table-eggs/bulk', [TableEggController::class, 'bulkDestroy']);
+    Route::delete('table-eggs/{table_egg}', [TableEggController::class, 'destroy']);
+
+    // 4.4: Inventario Actual (Stock)
     Route::get('inventory', [InventoryController::class, 'index']);
     Route::post('inventory/adjust', [InventoryController::class, 'adjust']);
 

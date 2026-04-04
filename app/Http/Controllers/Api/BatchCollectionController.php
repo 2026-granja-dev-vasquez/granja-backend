@@ -39,7 +39,7 @@ class BatchCollectionController extends Controller
             'batch_id' => 'nullable|required_if:type,collection|exists:batches,id',
             'quantity' => 'required|integer',
             'date' => 'required|date',
-            'type' => 'nullable|string|in:collection,adjustment',
+            'type' => 'nullable|string|in:collection,adjustment,reset',
         ]);
 
         if ($validator->fails()) {
@@ -81,7 +81,9 @@ class BatchCollectionController extends Controller
     public function dailyTotal(Request $request)
     {
         $date = $request->date ?? now()->toDateString();
-        $total = BatchCollection::whereDate('date', $date)->sum('quantity');
+        $total = BatchCollection::whereDate('date', $date)
+            ->where('type', 'collection')
+            ->sum('quantity');
         
         return response()->json(['date' => $date, 'total_raw_eggs' => (int)$total]);
     }
@@ -104,6 +106,7 @@ class BatchCollectionController extends Controller
         }
 
         $query = BatchCollection::with('batch')
+            ->where('type', 'collection') // Solo mostrar recolectas reales por galera
             ->whereBetween('date', [$startDate, $endDate])
             ->orderBy('date', 'desc');
 

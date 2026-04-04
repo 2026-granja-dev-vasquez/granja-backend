@@ -13,6 +13,7 @@ class BatchCollection extends Model
         'batch_id',
         'quantity',
         'date',
+        'type',
     ];
 
     protected $casts = [

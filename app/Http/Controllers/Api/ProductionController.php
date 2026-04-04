@@ -34,62 +34,62 @@ class ProductionController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'product_size_id' => 'nullable|exists:product_sizes,id',
-            'useful_quantity' => 'required|integer|min:0',
+            'useful_quantity'  => 'required|integer|min:0',
             'damaged_quantity' => 'nullable|integer|min:0',
-            'date' => 'required|date',
+            'date'             => 'required|date',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $date = Carbon::parse($request->date)->toDateString();
+        $date          = Carbon::parse($request->date)->toDateString();
         $productSizeId = $request->product_size_id;
 
-        // Buscar si ya existe un registro para esta fecha y este tamaño (o nulo)
-        $existing = Production::whereDate('date', $date)
-            ->where('product_size_id', $productSizeId)
-            ->first();
+        // ── Huevos dañados (sin tamaño): mantener upsert (solo 1 registro por día) ──
+        if ($productSizeId === null) {
+            $existing = Production::whereDate('date', $date)
+                ->whereNull('product_size_id')
+                ->first();
 
-        if ($existing) {
-            // Calcular diferencia para ajustar stock (solo si tiene tamaño)
-            $diff = $request->useful_quantity - $existing->useful_quantity;
-            
-            $existing->update([
-                'useful_quantity' => $request->useful_quantity,
-                'damaged_quantity' => $request->damaged_quantity ?? $existing->damaged_quantity,
-            ]);
-
-            // Ajustar Stock de Inventario
-            if ($productSizeId && $diff != 0) {
-                $inventory = \App\Models\Inventory::firstOrCreate(
-                    ['product_size_id' => $productSizeId],
-                    ['units_available' => 0]
-                );
-                $inventory->increment('units_available', $diff);
+            if ($existing) {
+                $existing->update([
+                    'useful_quantity'  => $request->useful_quantity,
+                    'damaged_quantity' => $request->damaged_quantity ?? $existing->damaged_quantity,
+                ]);
+                return response()->json([
+                    'message' => 'Dañados actualizados',
+                    'data'    => $existing->load('productSize')
+                ], 200);
             }
 
+            $production = Production::create($request->all());
             return response()->json([
-                'message' => 'Actualizado correctamente',
-                'data' => $existing->load('productSize')
-            ], 200);
+                'message' => 'Dañados registrados',
+                'data'    => $production->load('productSize')
+            ], 201);
         }
 
-        // Si no existe, crear nuevo
-        $production = Production::create($request->all());
+        // ── Huevos con tamaño: crear NUEVA entrada (múltiples entradas por día permitidas) ──
+        $production = Production::create([
+            'product_size_id'  => $productSizeId,
+            'useful_quantity'  => $request->useful_quantity,
+            'damaged_quantity' => $request->damaged_quantity ?? 0,
+            'date'             => $date,
+        ]);
 
-        // Actualizar Stock de Inventario para nuevos registros
-        if ($production->product_size_id && $production->useful_quantity > 0) {
+        // Actualizar Stock de Inventario
+        if ($production->useful_quantity > 0) {
             $inventory = \App\Models\Inventory::firstOrCreate(
-                ['product_size_id' => $production->product_size_id],
+                ['product_size_id' => $productSizeId],
                 ['units_available' => 0]
             );
             $inventory->increment('units_available', $production->useful_quantity);
         }
 
         return response()->json([
-            'message' => 'Registrado exitosamente',
-            'data' => $production->load('productSize')
+            'message' => 'Entrada de clasificación registrada',
+            'data'    => $production->load('productSize')
         ], 201);
     }
 
@@ -130,7 +130,7 @@ class ProductionController extends Controller
             // Calcular saldo pendiente al cierre de ese día específico
             $totalCollUpToDate = \App\Models\BatchCollection::whereDate('date', '<=', $dateStr)->sum('quantity');
             $totalSortUpToDate = Production::whereDate('date', '<=', $dateStr)->sum(DB::raw('useful_quantity + damaged_quantity'));
-            $pendingAtClose = max(0, $totalCollUpToDate - $totalSortUpToDate);
+            $pendingAtClose = (int)($totalCollUpToDate - $totalSortUpToDate); // Can be negative if sorts > collections
 
             if ($grouped->has($dateStr)) {
                 $items = $grouped->get($dateStr);
@@ -194,6 +194,7 @@ class ProductionController extends Controller
     }
     /*
      * Get pending eggs from previous days (Total Collected + Adjustments - Total Sorted up until date - 1).
+     * NOTE: Returns the real signed value. Negative means more eggs were sorted than collected (historical deficit).
      */
     public function pendingBalance(Request $request)
     {
@@ -205,11 +206,60 @@ class ProductionController extends Controller
         
         $totalSorted = Production::whereDate('date', '<', $dateStr)->sum(DB::raw('useful_quantity + damaged_quantity'));
 
-        $pending = max(0, $totalCollected - $totalSorted);
+        // Real signed value — negative means there's a historical deficit
+        $pending = (int)($totalCollected - $totalSorted);
 
         return response()->json([
             'date' => $dateStr,
-            'pending_from_yesterday' => (int)$pending
+            'pending_from_yesterday' => $pending
         ]);
+    }
+
+    /**
+     * Reset the running balance to a specific count.
+     * Creates a BatchCollection adjustment that makes "pending_from_yesterday" equal to $target_pending.
+     * This permanently corrects any historical drift.
+     */
+    public function resetBalance(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'target_pending' => 'required|integer|min:0',
+            'date'           => 'required|date',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $date    = Carbon::parse($request->date)->toDateString();
+        $target  = (int) $request->target_pending;
+
+        // Calculate the REAL current running balance up to (but not including) $date
+        $totalCollected = \App\Models\BatchCollection::whereDate('date', '<', $date)->sum('quantity');
+        $totalSorted    = Production::whereDate('date', '<', $date)->sum(DB::raw('useful_quantity + damaged_quantity'));
+        $currentBalance = (int)($totalCollected - $totalSorted);
+
+        // We need to inject this much into collections to make the balance equal $target
+        $adjustmentNeeded = $target - $currentBalance;
+
+        // Delete any existing reset/adjustment record for today to avoid doubles
+        \App\Models\BatchCollection::whereDate('date', $date)
+            ->where('type', 'reset')
+            ->delete();
+
+        $record = \App\Models\BatchCollection::create([
+            'date'     => $date,
+            'type'     => 'reset',
+            'quantity' => $adjustmentNeeded,
+            'batch_id' => null,
+        ]);
+
+        return response()->json([
+            'message'           => 'Balance reiniciado correctamente',
+            'previous_balance'  => $currentBalance,
+            'target_pending'    => $target,
+            'adjustment_applied'=> $adjustmentNeeded,
+            'data'              => $record,
+        ], 201);
     }
 }
