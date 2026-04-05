@@ -202,6 +202,49 @@ class OrderController extends Controller
         });
     }
 
+    public function update(Request $request, Order $order)
+    {
+        $request->validate([
+            'customer_id'              => 'required|exists:customers,id',
+            'delivery_date'            => 'required|date',
+            'items'                    => 'required|array|min:1',
+            'items.*.product_size_id'  => 'required|exists:product_sizes,id',
+            'items.*.quantity'         => 'required|integer|min:1',
+            'items.*.unit_price'       => 'required|numeric|min:0',
+            'notes'                    => 'nullable|string',
+        ]);
+
+        return DB::transaction(function () use ($request, $order) {
+            // Recalcular total
+            $totalAmount = 0;
+            foreach ($request->items as $item) {
+                $totalAmount += (float)$item['quantity'] * (float)$item['unit_price'];
+            }
+
+            // Actualizar datos del pedido
+            $order->update([
+                'customer_id'   => $request->customer_id,
+                'delivery_date' => $request->delivery_date,
+                'total_amount'  => $totalAmount,
+                'notes'         => $request->notes,
+            ]);
+
+            // Reemplazar items del pedido
+            $order->items()->delete();
+            foreach ($request->items as $item) {
+                $subtotal = (float)$item['quantity'] * (float)$item['unit_price'];
+                $order->items()->create([
+                    'product_size_id' => $item['product_size_id'],
+                    'quantity'        => $item['quantity'],
+                    'unit_price'      => $item['unit_price'],
+                    'subtotal'        => $subtotal,
+                ]);
+            }
+
+            return response()->json($order->load(['customer', 'items.productSize']));
+        });
+    }
+
     public function destroy(Order $order)
     {
         return DB::transaction(function() use ($order) {
