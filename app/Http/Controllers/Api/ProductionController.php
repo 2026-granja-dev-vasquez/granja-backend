@@ -81,8 +81,9 @@ class ProductionController extends Controller
             'origin'           => $request->origin ?? 'harvest',
         ]);
 
-        // Actualizar Stock de Inventario
-        if ($production->useful_quantity > 0) {
+        // Actualizar Stock de Inventario (SOLO si es cosecha nueva)
+        // La "Magia": Si es remanente, no toca el stock porque ya se sumó ayer
+        if ($production->origin !== 'remnant' && $production->useful_quantity > 0) {
             $inventory = \App\Models\Inventory::firstOrCreate(
                 ['product_size_id' => $productSizeId],
                 ['units_available' => 0]
@@ -192,8 +193,8 @@ class ProductionController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        // 1. Revertir efecto previo en Inventario (si aplica)
-        if ($production->product_size_id && $production->useful_quantity > 0) {
+        // 1. Revertir efecto previo en Inventario (Solo si NO era remanente)
+        if ($production->origin !== 'remnant' && $production->product_size_id && $production->useful_quantity > 0) {
             $inventory = \App\Models\Inventory::where('product_size_id', $production->product_size_id)->first();
             if ($inventory) {
                 $inventory->decrement('units_available', $production->useful_quantity);
@@ -207,8 +208,8 @@ class ProductionController extends Controller
             // El origen y el tamaño usualmente no cambian en edición
         ]);
 
-        // 3. Aplicar nuevo efecto en Inventario
-        if ($production->product_size_id && $production->useful_quantity > 0) {
+        // 3. Aplicar nuevo efecto en Inventario (Solo si NO es remanente)
+        if ($production->origin !== 'remnant' && $production->product_size_id && $production->useful_quantity > 0) {
             $inventory = \App\Models\Inventory::firstOrCreate(
                 ['product_size_id' => $production->product_size_id],
                 ['units_available' => 0]
@@ -230,8 +231,8 @@ class ProductionController extends Controller
     {
         DB::beginTransaction();
         try {
-            // 1. Si tenía tamaño (buenos), revertir el stock de inventario (ventas/listos)
-            if ($production->product_size_id && $production->useful_quantity > 0) {
+            // 1. Si tenía tamaño (buenos) y NO era remanente, revertir el stock de inventario
+            if ($production->origin !== 'remnant' && $production->product_size_id && $production->useful_quantity > 0) {
                 $inventory = \App\Models\Inventory::where('product_size_id', $production->product_size_id)->first();
                 if ($inventory) {
                     $inventory->decrement('units_available', $production->useful_quantity);
