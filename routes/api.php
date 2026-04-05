@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\CashBoxController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\ReminderController;
 use App\Http\Controllers\Api\TableEggController;
+use App\Http\Controllers\ExpenseCategoryController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -80,6 +81,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('cash/history',         [CashBoxController::class, 'index']);
     Route::get('cash/history/{cash_box}', [CashBoxController::class, 'show']);
     Route::patch('cash/history/{cash_box}', [CashBoxController::class, 'update']);
+    Route::patch('/cash/transactions/{id}', [CashBoxController::class, 'updateTransaction']);
+
+    // Módulo 6b: Rubros de Egresos
+    Route::get('expense-categories',    [ExpenseCategoryController::class, 'index']);
+    Route::post('expense-categories',   [ExpenseCategoryController::class, 'store']);
+    Route::patch('expense-categories/{expenseCategory}', [ExpenseCategoryController::class, 'update']);
+    Route::delete('expense-categories/{expenseCategory}', [ExpenseCategoryController::class, 'destroy']);
 
     // Módulo 7: Gestión de Usuarios
     Route::apiResource('users', UserController::class);

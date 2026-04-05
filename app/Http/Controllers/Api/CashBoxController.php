@@ -153,6 +153,21 @@ class CashBoxController extends Controller
     }
 
     /**
+     * Update the category (rubro) of a transaction.
+     */
+    public function updateTransaction(Request $request, $id)
+    {
+        $request->validate([
+            'category' => 'required|string|max:100',
+        ]);
+
+        $transaction = \App\Models\CashTransaction::findOrFail($id);
+        $transaction->update(['category' => $request->category]);
+
+        return response()->json($transaction);
+    }
+
+    /**
      * Void a specific transaction.
      */
     public function voidTransaction(Request $request, $id)
