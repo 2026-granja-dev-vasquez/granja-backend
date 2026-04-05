@@ -11,6 +11,8 @@ class Order extends Model
         'delivery_date',
         'status',
         'notes',
+        'total_amount',
+        'paid_amount'
     ];
 
     protected $casts = [
@@ -25,5 +27,10 @@ class Order extends Model
     public function items()
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    public function transactions()
+    {
+        return $this->morphMany(CashTransaction::class, 'reference');
     }
 }

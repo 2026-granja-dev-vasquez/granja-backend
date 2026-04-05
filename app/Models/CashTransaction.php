@@ -14,6 +14,7 @@ class CashTransaction extends Model
         'description',
         'reference_id',
         'reference_type',
+        'status',
         'created_at',
     ];
 
