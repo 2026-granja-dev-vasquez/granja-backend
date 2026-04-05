@@ -14,6 +14,7 @@ class Production extends Model
         'useful_quantity',
         'damaged_quantity',
         'date',
+        'origin',
     ];
 
     protected $casts = [

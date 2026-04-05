@@ -37,6 +37,7 @@ class ProductionController extends Controller
             'useful_quantity'  => 'required|integer|min:0',
             'damaged_quantity' => 'nullable|integer|min:0',
             'date'             => 'required|date',
+            'origin'           => 'nullable|string|in:harvest,remnant',
         ]);
 
         if ($validator->fails()) {
@@ -48,7 +49,8 @@ class ProductionController extends Controller
 
         // ── Huevos dañados (sin tamaño): mantener upsert (solo 1 registro por día) ──
         if ($productSizeId === null) {
-            $existing = Production::whereDate('date', $date)
+            $existing = Production::where('date', '>=', $date . ' 00:00:00')
+                ->where('date', '<=', $date . ' 23:59:59')
                 ->whereNull('product_size_id')
                 ->first();
 
@@ -76,6 +78,7 @@ class ProductionController extends Controller
             'useful_quantity'  => $request->useful_quantity,
             'damaged_quantity' => $request->damaged_quantity ?? 0,
             'date'             => $date,
+            'origin'           => $request->origin ?? 'harvest',
         ]);
 
         // Actualizar Stock de Inventario
@@ -128,15 +131,16 @@ class ProductionController extends Controller
             $dateStr = $currentDate->toDateString();
             
             // Calcular saldo pendiente al cierre de ese día específico
-            $totalCollUpToDate = \App\Models\BatchCollection::whereDate('date', '<=', $dateStr)->sum('quantity');
-            $totalSortUpToDate = Production::whereDate('date', '<=', $dateStr)->sum(DB::raw('useful_quantity + damaged_quantity'));
+            $totalCollUpToDate = \App\Models\BatchCollection::where('date', '<=', $dateStr . ' 23:59:59')->sum('quantity');
+            $totalSortUpToDate = Production::where('date', '<=', $dateStr . ' 23:59:59')->sum(DB::raw('useful_quantity + damaged_quantity'));
             $pendingAtClose = (int)($totalCollUpToDate - $totalSortUpToDate); // Can be negative if sorts > collections
 
             if ($grouped->has($dateStr)) {
                 $items = $grouped->get($dateStr);
                 $totalDamagedValue = (int)$items->sum('damaged_quantity');
                 
-                $bySize = $items->filter(fn($i) => $i->product_size_id !== null)
+                // Solo sumamos lo que es cosecha nueva del día para el reporte "Diario"
+                $bySize = $items->filter(fn($i) => $i->product_size_id !== null && $i->origin !== 'remnant')
                     ->groupBy('product_size_id')->map(function($sizeItems) {
                     $first = $sizeItems->first();
                     $units = (int)$sizeItems->sum('useful_quantity');
@@ -174,13 +178,21 @@ class ProductionController extends Controller
 
         return response()->json($finalReports);
     }
-
     /**
-     * Remove the specified sorted production.
+     * Update the specified sorted production.
      */
-    public function destroy(Production $production)
+    public function update(Request $request, Production $production)
     {
-        // Si tenía tamaño (buenos), revertir el stock de inventario
+        $validator = Validator::make($request->all(), [
+            'useful_quantity'  => 'required|integer|min:0',
+            'damaged_quantity' => 'required|integer|min:0',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        // 1. Revertir efecto previo en Inventario (si aplica)
         if ($production->product_size_id && $production->useful_quantity > 0) {
             $inventory = \App\Models\Inventory::where('product_size_id', $production->product_size_id)->first();
             if ($inventory) {
@@ -188,9 +200,69 @@ class ProductionController extends Controller
             }
         }
 
-        $production->delete();
+        // 2. Aplicar cambios
+        $production->update([
+            'useful_quantity'  => $request->useful_quantity,
+            'damaged_quantity' => $request->damaged_quantity,
+            // El origen y el tamaño usualmente no cambian en edición
+        ]);
 
-        return response()->json(['message' => 'Registro de producción eliminado y stock revertido']);
+        // 3. Aplicar nuevo efecto en Inventario
+        if ($production->product_size_id && $production->useful_quantity > 0) {
+            $inventory = \App\Models\Inventory::firstOrCreate(
+                ['product_size_id' => $production->product_size_id],
+                ['units_available' => 0]
+            );
+            $inventory->increment('units_available', $production->useful_quantity);
+        }
+
+        return response()->json([
+            'message' => 'Registro actualizado correctamente',
+            'data'    => $production
+        ]);
+    }
+
+
+    /**
+     * Remove the specified sorted production.
+     */
+    public function destroy(Production $production)
+    {
+        DB::beginTransaction();
+        try {
+            // 1. Si tenía tamaño (buenos), revertir el stock de inventario (ventas/listos)
+            if ($production->product_size_id && $production->useful_quantity > 0) {
+                $inventory = \App\Models\Inventory::where('product_size_id', $production->product_size_id)->first();
+                if ($inventory) {
+                    $inventory->decrement('units_available', $production->useful_quantity);
+                }
+            }
+
+            // 2. Si venía de Remanente (Ayer), restaurar los huevos a la mesa (TableEgg)
+            // Esto permite que el usuario los clasifique de nuevo si se equivocó
+            if ($production->origin === 'remnant' && $production->product_size_id) {
+                $totalToRestore = $production->useful_quantity + $production->damaged_quantity;
+                
+                if ($totalToRestore > 0) {
+                    $tableEgg = \App\Models\TableEgg::firstOrCreate(
+                        [
+                            'date'            => $production->date->toDateString(),
+                            'product_size_id' => $production->product_size_id,
+                        ],
+                        ['quantity' => 0]
+                    );
+                    $tableEgg->increment('quantity', $totalToRestore);
+                }
+            }
+
+            $production->delete();
+            DB::commit();
+
+            return response()->json(['message' => 'Registro eliminado y stock/remanentes restaurados']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Error al eliminar: ' . $e->getMessage()], 500);
+        }
     }
     /*
      * Get pending eggs from previous days (Total Collected + Adjustments - Total Sorted up until date - 1).
@@ -204,14 +276,15 @@ class ProductionController extends Controller
         // Sumar todo lo recolectado (normal + ajustes) antes de la fecha objetivo
         // IMPORTANTE: Incluimos los resets del mismo día ya que son ajustes para "iniciar bien" ese día
         $totalCollected = \App\Models\BatchCollection::where(function($q) use ($dateStr) {
-            $q->whereDate('date', '<', $dateStr)
+            $q->where('date', '<', $dateStr . ' 00:00:00')
               ->orWhere(function($sub) use ($dateStr) {
-                  $sub->whereDate('date', $dateStr)
+                  $sub->where('date', '>=', $dateStr . ' 00:00:00')
+                      ->where('date', '<=', $dateStr . ' 23:59:59')
                       ->whereIn('type', ['reset', 'adjustment']);
               });
         })->sum('quantity');
         
-        $totalSorted = Production::whereDate('date', '<', $dateStr)->sum(DB::raw('useful_quantity + damaged_quantity'));
+        $totalSorted = Production::where('date', '<', $dateStr . ' 00:00:00')->sum(DB::raw('useful_quantity + damaged_quantity'));
 
         // Real signed value — negative means there's a historical deficit
         $pending = (int)($totalCollected - $totalSorted);
@@ -242,15 +315,16 @@ class ProductionController extends Controller
         $target  = (int) $request->target_pending;
 
         // Calculate the REAL current running balance up to (but not including) $date
-        $totalCollected = \App\Models\BatchCollection::whereDate('date', '<', $date)->sum('quantity');
-        $totalSorted    = Production::whereDate('date', '<', $date)->sum(DB::raw('useful_quantity + damaged_quantity'));
+        $totalCollected = \App\Models\BatchCollection::where('date', '<', $date . ' 00:00:00')->sum('quantity');
+        $totalSorted    = Production::where('date', '<', $date . ' 00:00:00')->sum(DB::raw('useful_quantity + damaged_quantity'));
         $currentBalance = (int)($totalCollected - $totalSorted);
 
         // We need to inject this much into collections to make the balance equal $target
         $adjustmentNeeded = $target - $currentBalance;
 
         // Delete any existing reset/adjustment record for today to avoid doubles
-        \App\Models\BatchCollection::whereDate('date', $date)
+        \App\Models\BatchCollection::where('date', '>=', $date . ' 00:00:00')
+            ->where('date', '<=', $date . ' 23:59:59')
             ->where('type', 'reset')
             ->delete();
 

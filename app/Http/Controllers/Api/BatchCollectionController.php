@@ -81,7 +81,8 @@ class BatchCollectionController extends Controller
     public function dailyTotal(Request $request)
     {
         $date = $request->date ?? now()->toDateString();
-        $total = BatchCollection::whereDate('date', $date)
+        $total = BatchCollection::where('date', '>=', $date . ' 00:00:00')
+            ->where('date', '<=', $date . ' 23:59:59')
             ->where('type', 'collection')
             ->sum('quantity');
         
