@@ -30,4 +30,12 @@ class Batch extends Model
     {
         return $this->hasMany(Mortality::class);
     }
+
+    /**
+     * Relación: Un lote tiene muchos ajustes.
+     */
+    public function adjustments()
+    {
+        return $this->hasMany(BatchAdjustment::class);
+    }
 }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Batch;
 use App\Models\Mortality;
+use App\Models\BatchAdjustment;
 use Illuminate\Http\Request;
 
 class BatchController extends Controller
@@ -31,7 +32,7 @@ class BatchController extends Controller
 
     public function show(Batch $batch)
     {
-        return response()->json($batch->load('mortalities'));
+        return response()->json($batch->load(['mortalities', 'adjustments']));
     }
 
     public function update(Request $request, Batch $batch)
@@ -53,9 +54,6 @@ class BatchController extends Controller
         return response()->json(['message' => 'Lote eliminado correctamente.']);
     }
 
-    /**
-     * Registro de mortalidad para un lote específico.
-     */
     public function registerMortality(Request $request, Batch $batch)
     {
         $validated = $request->validate([
@@ -70,6 +68,31 @@ class BatchController extends Controller
             'message'   => 'Mortalidad registrada con éxito.',
             'mortality' => $mortality,
             'batch'     => $batch->fresh(), // Devolver el lote actualizado
+        ], 201);
+    }
+
+    /**
+     * Registro de ajuste de inventario (aves) para un lote específico.
+     */
+    public function registerAdjustment(Request $request, Batch $batch)
+    {
+        $validated = $request->validate([
+            'quantity' => 'required|integer|not_in:0', // Puede ser positivo o negativo
+            'date'     => 'required|date',
+            'reason'   => 'required|string|max:255',
+        ]);
+
+        // Si es negativo (reducción), no puede ser mayor que lo que hay vivo
+        if ($validated['quantity'] < 0 && abs($validated['quantity']) > $batch->current_quantity) {
+            return response()->json(['message' => 'No puedes ajustar más aves de las que hay vivas.'], 422);
+        }
+
+        $adjustment = $batch->adjustments()->create($validated);
+
+        return response()->json([
+            'message'    => 'Ajuste de lote registrado con éxito.',
+            'adjustment' => $adjustment,
+            'batch'      => $batch->fresh(),
         ], 201);
     }
 }

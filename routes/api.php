@@ -39,6 +39,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Módulo 2: Gestión de Lotes
     Route::apiResource('batches', BatchController::class);
     Route::post('batches/{batch}/mortality', [BatchController::class, 'registerMortality']);
+    Route::post('batches/{batch}/adjust',    [BatchController::class, 'registerAdjustment']);
 
     // Módulo 3: Configuración de Productos (Tamaños y Precios)
     Route::apiResource('product-sizes', ProductSizeController::class);
