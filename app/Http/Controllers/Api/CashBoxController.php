@@ -26,9 +26,7 @@ class CashBoxController extends Controller
      */
     public function show($id)
     {
-        $cashBox = CashBox::with(['transactions' => function($q) {
-                $q->where('status', 'active');
-            }])
+        $cashBox = CashBox::with(['transactions'])
             ->findOrFail($id);
 
         return response()->json($cashBox);
@@ -40,9 +38,7 @@ class CashBoxController extends Controller
     public function current(Request $request)
     {
         $current = CashBox::where('status', 'open')
-            ->with(['transactions' => function($q) {
-                $q->where('status', 'active');
-            }])
+            ->with(['transactions'])
             ->latest()
             ->first();
 
@@ -154,5 +150,48 @@ class CashBoxController extends Controller
         ]);
 
         return response()->json($cashBox);
+    }
+
+    /**
+     * Void a specific transaction.
+     */
+    public function voidTransaction(Request $request, $id)
+    {
+        // Safety check for Admin
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['message' => 'Solo los administradores pueden anular transacciones.'], 403);
+        }
+
+        $request->validate([
+            'void_reason' => 'required|string|min:3',
+        ]);
+
+        $transaction = CashTransaction::findOrFail($id);
+
+        if ($transaction->status === 'voided') {
+            return response()->json(['message' => 'Esta transacción ya está anulada.'], 422);
+        }
+
+        $cashBox = $transaction->cashBox;
+
+        if ($cashBox->status !== 'open') {
+            return response()->json(['message' => 'Solo se pueden anular transacciones de una caja abierta.'], 422);
+        }
+
+        return DB::transaction(function () use ($transaction, $request, $cashBox) {
+            $transaction->update([
+                'status' => 'voided',
+                'void_reason' => $request->void_reason,
+            ]);
+
+            // Adjust totals in the box
+            if ($transaction->type === 'income') {
+                $cashBox->decrement('total_income', $transaction->amount);
+            } else {
+                $cashBox->decrement('total_expense', $transaction->amount);
+            }
+
+            return response()->json(['message' => 'Transacción anulada con éxito.', 'transaction' => $transaction]);
+        });
     }
 }

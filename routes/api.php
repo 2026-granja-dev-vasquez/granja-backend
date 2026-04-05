@@ -74,7 +74,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('cash/current',         [CashBoxController::class, 'current']);
     Route::post('cash/open',           [CashBoxController::class, 'open']);
     Route::post('cash/close',          [CashBoxController::class, 'close']);
-    Route::post('cash/transactions',   [CashBoxController::class, 'storeTransaction']);
+    Route::post('/cash/transactions', [CashBoxController::class, 'storeTransaction']);
+    Route::post('/cash/transactions/{id}/void', [CashBoxController::class, 'voidTransaction']);
     Route::get('cash/history',         [CashBoxController::class, 'index']);
     Route::get('cash/history/{cash_box}', [CashBoxController::class, 'show']);
     Route::patch('cash/history/{cash_box}', [CashBoxController::class, 'update']);
