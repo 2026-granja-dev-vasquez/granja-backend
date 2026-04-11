@@ -1,59 +1,215 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Granja Backend
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+API backend del micro-ERP avicola. Este proyecto centraliza la logica de negocio de la granja: autenticacion, lotes, produccion diaria, inventario, ventas, caja, usuarios, recordatorios y pedidos.
 
-## About Laravel
+Su responsabilidad principal es exponer una API protegida con Laravel Sanctum para que la app movil pueda operar con datos consistentes y reglas del negocio en un solo lugar.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Que resuelve este proyecto
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+Este backend modela el flujo operativo de una granja de huevos:
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- Control de lotes de aves y su cantidad viva actual.
+- Registro de recoleccion diaria por lote.
+- Clasificacion de huevos por tamano y control de mermas.
+- Inventario disponible para venta.
+- Registro de clientes, ventas y cuentas por cobrar.
+- Apertura y cierre de caja, ingresos, egresos y anulaciones.
+- Recordatorios compartidos para tareas operativas.
+- Pedidos programados de clientes y su conversion a venta.
 
-## Learning Laravel
+## Stack tecnico
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+- PHP 8.2
+- Laravel 12
+- Laravel Sanctum para autenticacion por token
+- Eloquent ORM
+- Vite para assets del proyecto Laravel
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Modulos principales
 
-## Laravel Sponsors
+### 1. Autenticacion
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+- Login con correo y contrasena.
+- Emision y revocacion de tokens.
+- Endpoint para perfil autenticado.
+- Recuperacion y reseteo de contrasena.
 
-### Premium Partners
+### 2. Gestion de lotes
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+- CRUD de lotes.
+- Registro de mortalidad.
+- Ajustes manuales de cantidad viva.
 
-## Contributing
+### 3. Productos
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+- Catalogo de tamanos de huevo.
+- Configuracion de precios por tamano.
 
-## Code of Conduct
+### 4. Produccion e inventario
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+- Recolecciones por lote.
+- Clasificacion diaria de produccion.
+- Huevos remanentes en mesa.
+- Balance pendiente entre recoleccion y clasificacion.
+- Inventario actual por tamano.
 
-## Security Vulnerabilities
+Regla importante:
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+- 1 carton = 30 huevos.
 
-## License
+### 5. Clientes y ventas
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- CRUD de clientes.
+- Registro de ventas con items.
+- Rebaja automatica de inventario.
+- Manejo de ventas pendientes, parciales o pagadas.
+
+### 6. Caja
+
+- Apertura de caja.
+- Registro de ingresos y egresos.
+- Cierre de caja.
+- Historial de sesiones.
+- Anulacion de transacciones por administrador.
+- Rubros de egresos.
+
+### 7. Usuarios
+
+- CRUD de usuarios.
+- Cambio de contrasena.
+- Roles de acceso.
+
+### 8. Recordatorios
+
+- Creacion de tareas programadas.
+- Soporte para repeticion unica, mensual o por intervalo.
+- Historial de tareas completadas.
+
+### 9. Pedidos
+
+- Registro de pedidos pendientes o pospuestos.
+- Control de fecha de entrega.
+- Abonos iniciales.
+- Conversion opcional a venta al momento de entregar.
+
+## Estructura importante
+
+```text
+granja-backend/
+├── app/
+│   ├── Http/Controllers/
+│   │   ├── Auth/
+│   │   ├── Api/
+│   │   └── ...
+│   └── Models/
+├── config/
+├── database/
+│   ├── migrations/
+│   └── seeders/
+├── public/
+├── resources/
+├── routes/
+│   ├── api.php
+│   └── web.php
+└── tests/
+```
+
+### Donde esta la logica
+
+- `routes/api.php`: mapa principal de endpoints.
+- `app/Http/Controllers/Api`: controladores de modulos funcionales.
+- `app/Http/Controllers/Auth`: autenticacion y recuperacion de contrasena.
+- `app/Models`: entidades del dominio.
+- `database/migrations`: estructura de base de datos.
+- `database/seeders/DatabaseSeeder.php`: semilla inicial de usuario admin.
+
+## Flujo general con la app movil
+
+1. La app Flutter inicia sesion usando `/auth/login`.
+2. El backend responde con un token Sanctum.
+3. La app usa ese token para consumir el resto de endpoints.
+4. Cada modulo de la app consulta o registra datos contra esta API.
+
+## Endpoints funcionales por dominio
+
+Los endpoints mas importantes estan agrupados de esta forma:
+
+- `auth/*`: login, logout, perfil, recuperacion de contrasena.
+- `batches/*`: lotes, mortalidad y ajustes.
+- `product-sizes/*`: tamanos y precios.
+- `daily-collections/*`: recolecta por lote.
+- `productions/*`: clasificacion, resumen y balance pendiente.
+- `table-eggs/*`: remanentes en mesa.
+- `inventory/*`: stock disponible y ajustes.
+- `customers/*`: clientes.
+- `sales/*`: ventas.
+- `cash/*`: caja activa, historial y transacciones.
+- `expense-categories/*`: rubros de egreso.
+- `users/*`: usuarios.
+- `reminders/*`: recordatorios.
+- `orders/*`: pedidos e historial.
+
+## Requisitos para levantarlo
+
+- PHP 8.2+
+- Composer
+- Node.js y npm
+- Base de datos compatible con Laravel
+
+## Instalacion local
+
+```bash
+composer install
+npm install
+```
+
+Este proyecto espera un archivo `.env` con configuracion Laravel estandar y credenciales de base de datos. Si otra persona va a trabajar en el sistema, necesita una copia valida del `.env` del equipo o crear uno equivalente segun el entorno.
+
+## Comandos utiles
+
+```bash
+php artisan serve
+php artisan migrate
+php artisan db:seed
+php artisan test
+npm run dev
+```
+
+Tambien existe un comando de arranque combinado definido en Composer:
+
+```bash
+composer run dev
+```
+
+Y un setup rapido:
+
+```bash
+composer run setup
+```
+
+## Datos semilla
+
+El seeder actual crea un usuario administrador inicial para pruebas locales desde `database/seeders/DatabaseSeeder.php`.
+
+## Estado actual del proyecto
+
+El backend ya no es un scaffold vacio de Laravel. Tiene desarrollo funcional real y la mayor parte del conocimiento del sistema vive en el codigo, especialmente en:
+
+- rutas de API
+- controladores
+- modelos
+- migraciones
+
+Por eso, si alguien nuevo entra al proyecto, la forma mas rapida de entenderlo es revisar primero:
+
+1. `routes/api.php`
+2. `app/Http/Controllers/Api`
+3. `app/Models`
+4. `database/migrations`
+
+## Notas para nuevos colaboradores
+
+- La API esta pensada principalmente para la app Flutter del repositorio `granja-movil`.
+- Varias reglas del negocio afectan inventario y caja; conviene tocar esos modulos con cuidado porque estan interconectados.
+- Hay logica financiera y de inventario que cruza ventas, pedidos, produccion y caja.
+- Antes de cambiar comportamiento, conviene revisar bien controladores como `ProductionController`, `SaleController`, `CashBoxController` y `OrderController`.
