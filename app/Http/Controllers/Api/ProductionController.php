@@ -133,7 +133,13 @@ class ProductionController extends Controller
             
             // Calcular saldo pendiente al cierre de ese día específico
             $totalCollUpToDate = \App\Models\BatchCollection::where('date', '<=', $dateStr . ' 23:59:59')->sum('quantity');
-            $totalSortUpToDate = Production::where('date', '<=', $dateStr . ' 23:59:59')->sum(DB::raw('useful_quantity + damaged_quantity'));
+            // Excluir remanentes del balance histórico: esos huevos no son
+            // producción nueva del día, solo reclasificación de arrastre.
+            $totalSortUpToDate = Production::where('date', '<=', $dateStr . ' 23:59:59')
+                ->where(function ($q) {
+                    $q->whereNull('origin')->orWhere('origin', '!=', 'remnant');
+                })
+                ->sum(DB::raw('useful_quantity + damaged_quantity'));
             $pendingAtClose = (int)($totalCollUpToDate - $totalSortUpToDate); // Can be negative if sorts > collections
 
             if ($grouped->has($dateStr)) {
@@ -285,7 +291,12 @@ class ProductionController extends Controller
               });
         })->sum('quantity');
         
-        $totalSorted = Production::where('date', '<', $dateStr . ' 00:00:00')->sum(DB::raw('useful_quantity + damaged_quantity'));
+        // Excluir remanentes para evitar déficit artificial recurrente.
+        $totalSorted = Production::where('date', '<', $dateStr . ' 00:00:00')
+            ->where(function ($q) {
+                $q->whereNull('origin')->orWhere('origin', '!=', 'remnant');
+            })
+            ->sum(DB::raw('useful_quantity + damaged_quantity'));
 
         // Real signed value — negative means there's a historical deficit
         $pending = (int)($totalCollected - $totalSorted);
@@ -317,7 +328,12 @@ class ProductionController extends Controller
 
         // Calculate the REAL current running balance up to (but not including) $date
         $totalCollected = \App\Models\BatchCollection::where('date', '<', $date . ' 00:00:00')->sum('quantity');
-        $totalSorted    = Production::where('date', '<', $date . ' 00:00:00')->sum(DB::raw('useful_quantity + damaged_quantity'));
+        // Excluir remanentes para no inflar el histórico clasificado.
+        $totalSorted    = Production::where('date', '<', $date . ' 00:00:00')
+            ->where(function ($q) {
+                $q->whereNull('origin')->orWhere('origin', '!=', 'remnant');
+            })
+            ->sum(DB::raw('useful_quantity + damaged_quantity'));
         $currentBalance = (int)($totalCollected - $totalSorted);
 
         // We need to inject this much into collections to make the balance equal $target
