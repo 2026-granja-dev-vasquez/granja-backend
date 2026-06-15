@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\CashBox;
 use App\Models\CashTransaction;
+use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -53,6 +54,7 @@ class CashBoxController extends Controller
         $request->validate([
             'name' => 'required|string',
             'opening_balance' => 'required|numeric|min:0',
+            'date' => 'nullable|date',
         ]);
 
         // Check if there is already an open box (Global check)
@@ -67,7 +69,7 @@ class CashBoxController extends Controller
             'user_id' => $request->user()->id, // Track who opened it
             'opening_balance' => (float)$request->opening_balance,
             'status' => 'open',
-            'opened_at' => now(),
+            'opened_at' => $this->localDateTime($request->date),
         ]);
 
         return response()->json($cashBox);
@@ -98,7 +100,7 @@ class CashBoxController extends Controller
                 'amount' => (float)$request->amount,
                 'category' => $request->category,
                 'description' => $request->description,
-                'created_at' => $request->date ? $request->date : now(),
+                'created_at' => $this->localDateTime($request->date),
             ]);
 
             // Update totals in the box
@@ -117,6 +119,10 @@ class CashBoxController extends Controller
      */
     public function close(Request $request)
     {
+        $request->validate([
+            'date' => 'nullable|date',
+        ]);
+
         $cashBox = CashBox::where('status', 'open')->first();
             
         if (!$cashBox) {
@@ -129,7 +135,7 @@ class CashBoxController extends Controller
         $cashBox->update([
             'closing_balance' => $theoreticalBalance,
             'status' => 'closed',
-            'closed_at' => now(),
+            'closed_at' => $this->localDateTime($request->date),
         ]);
 
         return response()->json($cashBox);
@@ -208,5 +214,10 @@ class CashBoxController extends Controller
 
             return response()->json(['message' => 'Transacción anulada con éxito.', 'transaction' => $transaction]);
         });
+    }
+
+    private function localDateTime(?string $dateTime = null): string
+    {
+        return Carbon::parse($dateTime ?? now())->format('Y-m-d H:i:s');
     }
 }

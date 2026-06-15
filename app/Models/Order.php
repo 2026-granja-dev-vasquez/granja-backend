@@ -16,7 +16,7 @@ class Order extends Model
     ];
 
     protected $casts = [
-        'delivery_date' => 'datetime',
+        'delivery_date' => 'datetime:Y-m-d H:i:s',
     ];
 
     public function customer()

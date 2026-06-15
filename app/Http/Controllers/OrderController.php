@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Models\Sale;
 use App\Models\Inventory;
 use App\Models\CashBox;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -42,6 +43,7 @@ class OrderController extends Controller
         $request->validate([
             'customer_id' => 'required|exists:customers,id',
             'delivery_date' => 'required|date',
+            'date' => 'nullable|date',
             'items' => 'required|array|min:1',
             'items.*.product_size_id' => 'required|exists:product_sizes,id',
             'items.*.quantity' => 'required|integer|min:1',
@@ -59,7 +61,7 @@ class OrderController extends Controller
             // 2. Crear Pedido
             $order = Order::create([
                 'customer_id'   => $request->customer_id,
-                'delivery_date' => $request->delivery_date,
+                'delivery_date' => Carbon::parse($request->delivery_date)->format('Y-m-d H:i:s'),
                 'status'        => 'pending',
                 'notes'         => $request->notes,
                 'total_amount'  => $totalAmount,
@@ -92,6 +94,7 @@ class OrderController extends Controller
                     'description'    => "Abono inicial Pedido #{$order->id} - " . ($order->customer->name ?? 'Cliente'),
                     'reference_id'   => $order->id,
                     'reference_type' => Order::class,
+                    'created_at'     => Carbon::parse($request->date ?? now())->format('Y-m-d H:i:s'),
                 ]);
                 $activeCashBox->increment('total_income', $paidAmount);
             }
@@ -117,7 +120,7 @@ class OrderController extends Controller
             $order->status = $request->status;
             
             if ($request->has('delivery_date')) {
-                $order->delivery_date = $request->delivery_date;
+                $order->delivery_date = Carbon::parse($request->delivery_date)->format('Y-m-d H:i:s');
             }
             
             if ($request->has('notes')) {
@@ -166,7 +169,7 @@ class OrderController extends Controller
                     'total_amount' => $totalAmount,
                     'paid_amount'  => $order->paid_amount + $additionalPaid,
                     'status'       => ($order->paid_amount + $additionalPaid) >= $totalAmount ? 'paid' : 'partial',
-                    'date'         => $saleData['date'] ?? now(),
+                    'date'         => Carbon::parse($saleData['date'] ?? now())->toDateString(),
                     'notes'        => $saleData['notes'] ?? ("Entrega Pedido #{$order->id}"),
                 ]);
 
@@ -190,6 +193,7 @@ class OrderController extends Controller
                         'description'    => "Pago final Pedido #{$order->id} - " . ($order->customer->name ?? 'Cliente'),
                         'reference_id'   => $sale->id,
                         'reference_type' => Sale::class,
+                        'created_at'     => Carbon::parse($saleData['date'] ?? now())->format('Y-m-d H:i:s'),
                     ]);
                     $activeCashBox->increment('total_income', $additionalPaid);
                 }
@@ -224,7 +228,7 @@ class OrderController extends Controller
             // Actualizar datos del pedido
             $order->update([
                 'customer_id'   => $request->customer_id,
-                'delivery_date' => $request->delivery_date,
+                'delivery_date' => Carbon::parse($request->delivery_date)->format('Y-m-d H:i:s'),
                 'total_amount'  => $totalAmount,
                 'notes'         => $request->notes,
             ]);

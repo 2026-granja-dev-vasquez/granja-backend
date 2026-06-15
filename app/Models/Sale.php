@@ -21,7 +21,7 @@ class Sale extends Model
     protected $casts = [
         'total_amount' => 'decimal:2',
         'paid_amount'  => 'decimal:2',
-        'date'         => 'date',
+        'date'         => 'date:Y-m-d',
     ];
 
     /**

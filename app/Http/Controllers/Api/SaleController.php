@@ -8,6 +8,7 @@ use App\Models\SaleItem;
 use App\Models\Inventory;
 use App\Models\CashBox;
 use App\Models\CashTransaction;
+use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -25,7 +26,7 @@ class SaleController extends Controller
         }
 
         if ($request->has('start_date') && $request->has('end_date')) {
-            $query->whereBetween('date', [$request->start_date . ' 00:00:00', $request->end_date . ' 23:59:59']);
+            $query->whereBetween('date', [$request->start_date, $request->end_date]);
         }
 
         $sales = $query->orderBy('date', 'desc')->get();
@@ -71,7 +72,7 @@ class SaleController extends Controller
                     'total_amount' => $validated['total_amount'],
                     'paid_amount'  => $validated['paid_amount'],
                     'status'       => $validated['status'],
-                    'date'         => $validated['date'],
+                    'date'         => Carbon::parse($validated['date'])->toDateString(),
                     'notes'        => $validated['notes'],
                 ]);
 
@@ -105,6 +106,7 @@ class SaleController extends Controller
                             'description'    => "Venta #{$sale->id} - " . ($sale->customer ? $sale->customer->name : 'Consumidor Final'),
                             'reference_id'   => $sale->id,
                             'reference_type' => Sale::class,
+                            'created_at'     => Carbon::parse($validated['date'])->format('Y-m-d H:i:s'),
                         ]);
                         $activeCashBox->increment('total_income', (float)$sale->paid_amount);
                     }
@@ -144,7 +146,11 @@ class SaleController extends Controller
             'paid_amount' => 'nullable|numeric|min:0',
             'status'      => 'nullable|in:pending,paid,partial',
             'notes'       => 'nullable|string',
+            'date'        => 'nullable|date',
         ]);
+
+        $paymentDate = $validated['date'] ?? null;
+        unset($validated['date']);
 
         $oldStatus = $sale->status;
         $sale->update($validated);
@@ -162,6 +168,7 @@ class SaleController extends Controller
                     'description'    => "COBRO de " . ($sale->customer ? $sale->customer->name : 'Consumidor Final') . " por fiado (Venta #{$sale->id})",
                     'reference_id'   => $sale->id,
                     'reference_type' => Sale::class,
+                    'created_at'     => Carbon::parse($paymentDate ?? now())->format('Y-m-d H:i:s'),
                 ]);
                 $activeCashBox->increment('total_income', (float)$amountToRecord);
             }

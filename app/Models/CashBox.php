@@ -19,8 +19,8 @@ class CashBox extends Model
     ];
 
     protected $casts = [
-        'opened_at' => 'datetime',
-        'closed_at' => 'datetime',
+        'opened_at' => 'datetime:Y-m-d H:i:s',
+        'closed_at' => 'datetime:Y-m-d H:i:s',
     ];
 
     public function user()
