@@ -27,7 +27,7 @@ class CashBoxController extends Controller
      */
     public function show($id)
     {
-        $cashBox = CashBox::with(['transactions'])
+        $cashBox = CashBox::with(['transactions.reference'])
             ->findOrFail($id);
 
         return response()->json($cashBox);
@@ -39,7 +39,7 @@ class CashBoxController extends Controller
     public function current(Request $request)
     {
         $current = CashBox::where('status', 'open')
-            ->with(['transactions'])
+            ->with(['transactions.reference'])
             ->latest()
             ->first();
 
